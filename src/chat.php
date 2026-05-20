@@ -94,7 +94,15 @@ $my_avatar   = !empty($avatar_raw) ? "uploads/" . $avatar_raw : "uploads/default
 <title>Messenger</title>
 
 
+<style>
+#profileAvatar {
+width: 120px;
+height: 120px;
+border-radius: 50%;
+object-fit: cover;
+}
 
+</style>
 
 
 <style>
@@ -451,7 +459,7 @@ cursor:pointer;
 <div class="sidebar">
     <div class="sidebar-header">
         <!-- آیکون پروفایل خودت کنار Chats -->
-        <img src="uploads/default-avatar.png" class="my-profile-icon" onclick="openProfile()">
+	<img src="<?php echo htmlspecialchars($my_avatar); ?>" class="my-profile-icon" onclick="openProfile()">
         <h2>Chats</h2>
         <div class="header-actions">
             <i class="fas fa-search"></i>
@@ -524,7 +532,15 @@ cursor:pointer;
         <!-- Profile Section -->
         <div class="profile-main">
             <div class="avatar-container" onclick="viewPhoto()">
-	    <img id="user-avatar" src="<?= $my_avatar ?>" onerror="this.src='uploads/default-avatar.png'" alt="Profile">
+	    <!-- <img id="user-avatar" src="<?= $my_avatar ?>" onerror="this.src='uploads/default-avatar.png'" alt="Profile"> -->
+            <img 
+                id="user-avatar"
+                src="<?php echo htmlspecialchars($my_avatar); ?>" 
+                alt="Profile"
+                onclick="viewPhoto()"
+                style="cursor:pointer;"
+            >
+
                 <div class="add-photo-icon">&#128247;</div>
             </div>
             
@@ -538,9 +554,9 @@ cursor:pointer;
         <div class="profile-list">
             <div class="list-item clickable" onclick="saveBio()">
                 <div class="item-icon">ℹ️</div>
-                <div class="item-text">
+		<div class="item-text">
+                    <small>About</small>
 		    <span id="bio-text"><?= htmlspecialchars($my_bio) ?></span>
-                    <small>درباره من</small>
                 </div>
             </div>
 
@@ -577,25 +593,27 @@ cursor:pointer;
 
 
 <script>
-async function loadChats(){
-	  const res = await fetch(`http://" + window.location.hostname  + ":8000/chats/${sender_id}`);
-	  const chats = await res.json();
-	  
-	  const list = document.querySelector(".chat-list");
-	  list.innerHTML = "";
-	  
-	  chats.forEach(c=>{
-	    list.innerHTML += `
-	      <div class="chat-item" onclick="openChat(${c.user_id})">
-	        <div class="avatar">${c.user_id}</div>
-	        <div class="chat-info">
-	          <div class="chat-name">User ${c.user_id}</div>
-	          <div class="chat-last">${c.last_message}</div>
-	        </div>
-	      </div>`;
-	  });
+
+async function loadChats() {
+    const res = await fetch(`/chats/${sender_id}`);
+    const chats = await res.json();
+
+    const list = document.querySelector(".chat-list");
+    list.innerHTML = "";
+
+    chats.forEach(c => {
+        list.innerHTML += `
+            <div class="chat-item" onclick="openChat('${c.chat_id}', ${c.user_id})">
+                <div class="avatar">${c.user_id}</div>
+                <div class="chat-info">
+                    <div class="chat-name">User ${c.user_id}</div>
+                    <div class="chat-last">${c.last_message}</div>
+                </div>
+            </div>
+        `;
+    });
 }
-	  
+
 </script>
 
 <script>
@@ -606,6 +624,10 @@ const username = "<?= $username ?>";
 const chat_id = "<?= $chat_id ?>";
 
 const messages = document.getElementById("messages");
+
+</script>
+
+<script>
 
 /* add message */
 
@@ -628,28 +650,26 @@ function addMessage(text,isSelf,time){
 
 /* load history */
 
-async function loadMessages(){
+async function loadMessages() {
+    const res = await fetch("/messages/" + chat_id);
+    const data = await res.json();
 
-	const res=await fetch("http://" + window.location.hostname  + ":8000/messages/"+chat_id);
+    messages.innerHTML = "";
 
-	const data=await res.json();
+    data.forEach(m => {
+        const time = new Date(m.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
 
-	data.forEach(m=>{
-
-	const time=new Date(m.timestamp).toLocaleTimeString([],{
-	hour:"2-digit",
-		minute:"2-digit"
-	});
-
-	addMessage(m.message,m.sender_id==sender_id,time);
-
-	});
-
+	addMessage(m.message, m.sender_id == sender_id, time);
+    });
 }
+
 
 /* websocket */
 
-const ws=new WebSocket("ws://" + window.location.hostname + ":8000/ws/"+sender_id);
+const ws=new WebSocket("ws://" + window.location.hostname + "/ws/" + sender_id);
 
 ws.onmessage=e=>{
 
@@ -719,20 +739,30 @@ function deletePhoto() {
 }
 
 // Upload image
+
 function uploadPhoto(input) {
     if (input.files && input.files[0]) {
-        let formData = new FormData();
-	formData.append('photo', input.files[0]);
-        formData.append('action', 'upload_photo');
+	let formData = new FormData();
+	formData.append('profile_picture', input.files[0]);
+	formData.append('action', 'upload_photo');
 
-        fetch('api/update_profile.php', {
+        fetch('api/upload_profile_picture.php', {
             method: 'POST',
             body: formData
-        }).then(res => res.json()).then(data => {
-            if(data.success) {
-                document.getElementById('user-avatar').src = 'uploads/' + data.filename;
+	})
+	.then(res => res.json())
+	.then(data => {
+	    if (data.success) {
+		document.getElementById('user-avatar').src = 'uploads/' + data.filename + '?t=' + Date.now();
+		document.querySelector('.my-profile-icon').src = 'uploads/' + data.filename + '?t=' + Date.now();
+	    } else {
+		alert(data.message || "Uploaded");
             }
-        });
+	})
+	.catch(err => {
+	    console.error(err);
+	    alert("Upload error");
+	});
     }
 }
 
@@ -743,7 +773,30 @@ function closeProfile() {
 
 // View photos
 function viewPhoto() {
-    alert("Photo viewer بخش بعدی است. اگر خواستی برات کاملش می‌سازم.");
+    const imgSrc = document.getElementById("user-avatar").src;
+
+    const viewer = document.createElement("div");
+    viewer.style.position = "fixed";
+    viewer.style.top = "0";
+    viewer.style.left = "0";
+    viewer.style.width = "100%";
+    viewer.style.height = "100%";
+    viewer.style.background = "rgba(0,0,0,0.9)";
+    viewer.style.display = "flex";
+    viewer.style.alignItems = "center";
+    viewer.style.justifyContent = "center";
+    viewer.style.zIndex = "3000";
+    viewer.style.cursor = "pointer";
+
+    viewer.innerHTML = `
+	<img src="${imgSrc}" style="max-width:90%; max-height:90%; border-radius:10px;">
+    `;
+
+    viewer.onclick = function () {
+	viewer.remove();
+    };
+
+    document.body.appendChild(viewer);
 }
 
 
@@ -811,6 +864,55 @@ function saveBio() {
 }
 
 
+
+</script>
+
+<input type="file" id="profilePicInput" accept="image/*" style="display:none;">
+
+
+<script>
+document.getElementById("profilePicInput").addEventListener("change", async function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("user-avatar", file);
+
+    try {
+        const res = await fetch("api/upload_profile_picture.php", {
+            method: "POST",
+            body: formData
+        });
+
+        const text = await res.text();
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            alert("Server error:\n" + text);
+            return;
+        }
+
+        if (data.status === "success") {
+            const newAvatar = data.file + "?t=" + new Date().getTime();
+
+            const profileAvatar = document.getElementById("profileAvatar");
+            const sidebarAvatar = document.getElementById("sidebarAvatar");
+
+            if (profileAvatar) profileAvatar.src = newAvatar;
+            if (sidebarAvatar) sidebarAvatar.src = newAvatar;
+
+            alert("Profile picture updated successfully.");
+        } else {
+            alert(data.message || "Upload failed.");
+        }
+    } catch (err) {
+        alert("Request failed.");
+        console.error(err);
+    }
+});
+</script>
 
 </script>
 
