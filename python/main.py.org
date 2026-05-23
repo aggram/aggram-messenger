@@ -9,15 +9,6 @@ app = FastAPI()
 
 # Cors configurations
 
-
-app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"]
-)
-
 origins = [
     "http://192.168.107.160",
     "http://192.168.107.160:80",
@@ -28,6 +19,13 @@ origins = [
     "http://localhost:8080"
 ]
 
+app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+)
 
 
 connections = []
@@ -51,8 +49,7 @@ def get_messages(chat_id: str):
             "receiver_id": d["receiver_id"],
             "message": d["message"],
             "user": d["user"],
-            "timestamp": str(d["timestamp"]),
-            "seen": d.get("seen", False)
+            "timestamp": str(d["timestamp"])
         })
 
     return result
@@ -142,7 +139,7 @@ def online():
 def get_unseen_counts(user_id: int):
 
     pipeline = [
-        {"$match": {"receiver_id": user_id, "seen": False}},
+        {"$match": {"receiver_id": user_id, "seen": false}},
         {"$group": {"_id": "$chat_id", "count": {"$sum": 1}}}
     ]
 
@@ -155,15 +152,33 @@ def get_unseen_counts(user_id: int):
     return unseen_map
 
 
-
-# Change messages from unseen to seen API
+# Change unseen to seen
 @app.post("/seen/{chat_id}/{receiver_id}")
-def mark_seen_api(chat_id: str, receiver_id: int):
+def mark_seen(chat_id: str, receiver_id: int):
     result = messages.update_many(
-        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": False},
-        {"$set": {"seen": True}}
+        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": false},
+        {"$set": {"seen": true}}
     )
-    return {"status": "success", "updated": result.modified_count}
+    return {"updated": result.modified_count}
+
+# This function will show unread messages
+def mark_messages_as_seen(chat_id, receiver_id):
+    
+    result = db.messages.update_many(
+        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": false},
+        {"$set": {"seen": true}}
+    )
+    return result.modified_count  # Count of messages were updated
+
+
+def get_unseen_counts(my_user_id):
+    pipeline = [
+        {"$match": {"receiver_id": my_user_id, "seen": false}},
+        {"$group": {"_id": "$chat_id", "count": {"$sum": 1}}}
+    ]
+    results = list(db.messages.aggregate(pipeline))
+    # Output in dictioanry type: {'1_2': 3, '1_5': 1}
+    return {item['_id']: item['count'] for item in results}
 
 
 # Websocket endpoint
@@ -200,7 +215,7 @@ async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
                     "uuid": payload["uuid"],
                     "message": payload["message"],
                     "timestamp": datetime.utcnow(),
-                    "seen": False
+                    "seen": false
 
                 }))
 
@@ -215,24 +230,5 @@ async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
     except:
         connections.remove(websocket)
 
-
-# This function will show unread messages
-#def mark_messages_as_seen(chat_id, receiver_id):
-#    
-#    result = db.messages.update_many(
-#        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": False},
-#        {"$set": {"seen": True}}
-#    )
-#    return result.modified_count  # Count of messages were updated
-
-
-def get_unseen_counts(my_user_id):
-    pipeline = [
-        {"$match": {"receiver_id": my_user_id, "seen": False}},
-        {"$group": {"_id": "$chat_id", "count": {"$sum": 1}}}
-    ]
-    results = list(db.messages.aggregate(pipeline))
-    # Output in dictioanry type: {'1_2': 3, '1_5': 1}
-    return {item['_id']: item['count'] for item in results}
 
             

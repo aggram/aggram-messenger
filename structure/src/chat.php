@@ -25,9 +25,6 @@ $chat_id = $sender_id < $receiver_id
 	    ? "{$sender_id}_{$receiver_id}"
 	    : "{$receiver_id}_{$sender_id}";
 
-$chat_id_org = $sender_id < $receiver_id
-	    ? "{$sender_id}_{$receiver_id}"
-	    : "{$receiver_id}_{$sender_id}";
 ?>
 
 <?php
@@ -255,8 +252,7 @@ background:#0e1621;
 /* CHAT HEADER */
 
 .chat-header{
-padding-top:10px;
-height:80px;
+height:60px;
 display:flex;
 align-items:center;
 padding:10px 20px;
@@ -449,17 +445,8 @@ cursor:pointer;
     }
 
     .chat-avatar {
-	width: 54px;
-	height: 54px;
-	margin-top: 20px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-
-
-    .chat-avatar-area {
-	width: 54px;
-	height: 54px;
+        width: 54px;
+        height: 54px;
         border-radius: 50%;
         object-fit: cover;
     }
@@ -614,7 +601,7 @@ cursor:pointer;
 <div class="chat-area">
 
 <div class="chat-header">
-    <img src="<?= $avatar_url ?>" class="chat-avatar-area" onerror="this.src='uploads/default-avatar.png'">
+    <img src="<?= $avatar_url ?>" class="chat-avatar" onerror="this.src='uploads/default-avatar.png'">
     <div class="chat-title"><?= htmlspecialchars($display_name) ?></div>
 </div>
 
@@ -735,7 +722,7 @@ async function loadChats() {
 const sender_id = <?= $sender_id ?>;
 const receiver_id = <?= $receiver_id ?>;
 const username = "<?= $username ?>";
-const chat_id = "<?= $chat_id_org ?>";
+const chat_id = "<?= $chat_id ?>";
 
 const messages = document.getElementById("messages");
 
@@ -745,22 +732,16 @@ const messages = document.getElementById("messages");
 
 /* add message */
 
-function addMessage(text,isSelf,time,isSeen){
-
-	/* For seen unseen tick  */
-	const tick = isSelf ? (isSeen ? "✓✓" : "✓") : "";
+function addMessage(text,isSelf,time){
 
 	const div=document.createElement("div");
 
 	div.className="message "+(isSelf?"self":"other");
 
-	div.innerHTML = `
-		        <div>${text}</div>
-        <div class="time">
-	    ${time}
-            <span style="margin-left: 5px;">${tick}</span>
-        </div>`;
-
+	div.innerHTML=`
+		<div>${text}</div>
+		<div class="time">${time}</div>
+`;
 
 	messages.appendChild(div);
 
@@ -771,7 +752,7 @@ function addMessage(text,isSelf,time,isSeen){
 /* load history */
 
 async function loadMessages() {
-    const res = await fetch("http://" + window.location.host + ":8000/messages/" + chat_id);
+    const res = await fetch("/messages/" + chat_id);
     const data = await res.json();
 
     messages.innerHTML = "";
@@ -782,14 +763,9 @@ async function loadMessages() {
             minute: "2-digit"
         });
 
-	addMessage(m.message, m.sender_id == sender_id, time, m.seen);
+	addMessage(m.message, m.sender_id == sender_id, time);
     });
-
-    fetch(`http://` + window.location.host  + `:8000/seen/${chat_id}/${sender_id}`, {
-        method: "POST"
-    }).then(res => console.log("Messages marked as seen"))
 }
-
 
 
 /* websocket */
@@ -805,12 +781,9 @@ if(data.chat_id===chat_id){
 	const time=new Date().toLocaleTimeString([],{
 	hour:"2-digit",
 		minute:"2-digit"
-
 });
 
-/* addMessage(data.message,data.sender_id==sender_id,time); */
-const isSelf = data.sender_id == sender_id;
-addMessage(data.message, isSelf, time, isSelf ? false : null);
+addMessage(data.message,data.sender_id==sender_id,time);
 
 }
 
@@ -1042,14 +1015,6 @@ document.getElementById("profilePicInput").addEventListener("change", async func
 });
 </script>
 
-</script>
-
-<script>
-function getTickIcon(isSelf, isSeen) {
-    if (!isSelf) return ""; // تیک فقط برای پیام‌های ارسالی خودمان
-    return isSeen ? "✓✓" : "✓";
-}
-					    
 </script>
 
 </body>

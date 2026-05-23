@@ -9,15 +9,6 @@ app = FastAPI()
 
 # Cors configurations
 
-
-app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"]
-)
-
 origins = [
     "http://192.168.107.160",
     "http://192.168.107.160:80",
@@ -28,6 +19,13 @@ origins = [
     "http://localhost:8080"
 ]
 
+app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+)
 
 
 connections = []
@@ -51,8 +49,7 @@ def get_messages(chat_id: str):
             "receiver_id": d["receiver_id"],
             "message": d["message"],
             "user": d["user"],
-            "timestamp": str(d["timestamp"]),
-            "seen": d.get("seen", False)
+            "timestamp": str(d["timestamp"])
         })
 
     return result
@@ -154,18 +151,6 @@ def get_unseen_counts(user_id: int):
 
     return unseen_map
 
-
-
-# Change messages from unseen to seen API
-@app.post("/seen/{chat_id}/{receiver_id}")
-def mark_seen_api(chat_id: str, receiver_id: int):
-    result = messages.update_many(
-        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": False},
-        {"$set": {"seen": True}}
-    )
-    return {"status": "success", "updated": result.modified_count}
-
-
 # Websocket endpoint
 @app.websocket("/ws/{receiver_id}")
 async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
@@ -217,13 +202,13 @@ async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
 
 
 # This function will show unread messages
-#def mark_messages_as_seen(chat_id, receiver_id):
-#    
-#    result = db.messages.update_many(
-#        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": False},
-#        {"$set": {"seen": True}}
-#    )
-#    return result.modified_count  # Count of messages were updated
+def mark_messages_as_seen(chat_id, receiver_id):
+    
+    result = db.messages.update_many(
+        {"chat_id": chat_id, "receiver_id": receiver_id, "seen": False},
+        {"$set": {"seen": True}}
+    )
+    return result.modified_count  # Count of messages were updated
 
 
 def get_unseen_counts(my_user_id):
