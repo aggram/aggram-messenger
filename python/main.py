@@ -3,6 +3,8 @@ from fastapi import FastAPI, WebSocket
 from bson import ObjectId
 from database import messages
 from datetime import datetime
+from pydantic import BaseModel
+import motor.motor_asyncio
 import asyncio, json
 
 app = FastAPI()
@@ -33,6 +35,11 @@ origins = [
 connections = []
 
 
+class EditMessageSchema(BaseModel):
+    message_id: str
+    new_content: str
+
+
 @app.get("/")
 def home():
         return {"status": "chat server running"}
@@ -47,6 +54,9 @@ def get_messages(chat_id: str):
 
     for d in docs:
         result.append({
+            "id": str(d["_id"]),
+            "uuid": d.get("uuid"),
+            "chat_id": d["chat_id"],
             "sender_id": d["sender_id"],
             "receiver_id": d["receiver_id"],
             "message": d["message"],
@@ -166,6 +176,22 @@ def mark_seen_api(chat_id: str, receiver_id: int):
     return {"status": "success", "updated": result.modified_count}
 
 
+@app.post("/update_message")
+async def update_message(data: EditMessageSchema):
+    try:
+        obj_id = ObjectId(data.message_id)
+                                    
+        result = await db.messages.update_one(
+            {"_id": obj_id},
+            {"$set": {"message": data.new_content}}
+        )
+                                                    
+        if result.modified_count == 0:
+            return {"status": "error", "message": "Message not found!"}, 404
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 400
+
 # Websocket endpoint
 @app.websocket("/ws/{receiver_id}")
 async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
@@ -183,29 +209,61 @@ async def websocket_endpoint(websocket: WebSocket, receiver_id: str):
 
             sender_id = int(payload["sender_id"])
             receiver_id = int(payload["receiver_id"])
-
             chat_id = f"{min(sender_id, receiver_id)}_{max(sender_id, receiver_id)}"
 
+            doc = {
+
+                "chat_id": chat_id,
+                "sender_id": sender_id,
+                "receiver_id": receiver_id,
+                "user": payload["user"],
+                "uuid": payload["uuid"],
+                "message": payload["message"],
+                "timestamp": datetime.utcnow(),
+                "seen": False
+      
+            }
+
+            
             # Insert into database
             try:
                 loop = asyncio.get_event_loop()
-
-                # Insert data in another thread
-                await loop.run_in_executor(None, lambda: messages.insert_one({
-
-                    "chat_id": chat_id,
-                    "sender_id": sender_id,
-                    "receiver_id": receiver_id,
-                    "user": payload["user"],
-                    "uuid": payload["uuid"],
-                    "message": payload["message"],
-                    "timestamp": datetime.utcnow(),
-                    "seen": False
-
-                }))
-
+                insert_result = await loop.run_in_executor(None, lambda: messages.insert_one(doc))
+                doc["_id"] = insert_result.inserted_id
             except Exception as e:
                 print(f"MongoDB error: {e}")
+                continue
+
+
+
+            out = {
+                "id": str(doc.get("_id")),
+                "uuid": doc["uuid"],
+                "chat_id": doc["chat_id"],
+                "sender_id": doc["sender_id"],
+                "receiver_id": doc["receiver_id"],
+                "user": doc["user"],
+                "message": doc["message"],
+                "timestamp": doc["timestamp"].isoformat(),
+                "seen": doc["seen"]
+            }
+
+                # Insert data in another thread
+            #    await loop.run_in_executor(None, lambda: messages.insert_one({
+
+            #        "chat_id": chat_id,
+            #        "sender_id": sender_id,
+            #        "receiver_id": receiver_id,
+            #        "user": payload["user"],
+            #        "uuid": payload["uuid"],
+            #        "message": payload["message"],
+            #        "timestamp": datetime.utcnow(),
+            #        "seen": False
+
+            #    }))
+
+            #except Exception as e:
+            #    print(f"MongoDB error: {e}")
 
 
             # Brodcast to users

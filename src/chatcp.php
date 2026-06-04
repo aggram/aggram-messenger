@@ -33,54 +33,16 @@ $chat_id_org = $sender_id < $receiver_id
 <?php
 
 $current_user_id = $_SESSION['user_id'];
-#$current_user_id = $_SESSION['user_id']; // یا هرجایی که آی‌دی خودت ذخیره شده
-#$other_user_id = $_GET['user_id'] ?? null;
-#
-#if ($other_user_id) {
-#
-#    $stmt = $conn->prepare("
-#        SELECT chat_id FROM chats 
-#        WHERE (user1_id = ? AND user2_id = ?) 
-#        OR (user1_id = ? AND user2_id = ?)
-#        LIMIT 1
-#    ");
-#
-#    $stmt->bind_param("iiii",
-#        $current_user_id,
-#        $other_user_id,
-#        $other_user_id,
-#        $current_user_id
-#    );
-#
-#    $stmt->execute();
-#    $result = $stmt->get_result();
-#
-#    if ($result->num_rows > 0) {
-#        $chat = $result->fetch_assoc();
-#        $active_chat_id = $chat['chat_id'];
-#    } else {
-#
-#        $stmt = $conn->prepare("
-#            INSERT INTO chats (user1_id, user2_id) 
-#            VALUES (?, ?)
-#        ");
-#
-#        $stmt->bind_param("ii", $current_user_id, $other_user_id);
-#        $stmt->execute();
-#
-#        $active_chat_id = $stmt->insert_id;
-#    }
-#}
 
-#$api_url = "http://fastapi:8000/unseen/" . $current_user_id;
-#
-#$response = file_get_contents($api_url);
-#
-#$unseen_data = json_decode($response, true);
-#
-#if (!$unseen_data) {
-#    $unseen_data = [];
-#}
+$api_url = "http://fastapi:8000/unseen/" . $current_user_id;
+
+$response = file_get_contents($api_url);
+
+$unseen_data = json_decode($response, true);
+
+if (!$unseen_data) {
+    $unseen_data = [];
+}
 
 
 ?>
@@ -545,44 +507,6 @@ cursor:pointer;
         margin-left:6px;
     }
 
-    .sidebar-search {
-        padding: 10px 15px;
-        position: relative;
-    }
-    
-    .sidebar-search input {
-        width: 100%;
-        padding: 8px 12px;
-        border-radius: 8px;
-        border: none;
-        background: #1e1e1e;
-        color: white;
-        outline: none;
-    }
-    
-    .search-results {
-        position: absolute;
-        top: 45px;
-        left: 15px;
-        right: 15px;
-        background: #1e1e1e;
-        border-radius: 8px;
-        max-height: 250px;
-        overflow-y: auto;
-        display: none;
-        z-index: 999;
-    }
-    
-    .search-item {
-        padding: 8px 12px;
-        cursor: pointer;
-    }
-    
-    .search-item:hover {
-        background: #2a2a2a;
-    }
-
-
 </style>
 
 
@@ -710,41 +634,6 @@ background-color: rgba(255, 255, 255, 0.08);
 
 </style>
 
-<!-- Edit message -->
-<style>
-
-.edit-box {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 100%;
-}
-.edit-input {
-    width: 100%;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    padding: 5px;
-    background: white;
-    color: black;
-    resize: none;
-}
-.edit-buttons {
-    display: flex;
-    gap: 5px;
-    justify-content: flex-end;
-}
-.edit-buttons button {
-    padding: 2px 8px;
-    cursor: pointer;
-    border-radius: 4px;
-    border: none;
-}
-.edit-buttons button:first-child { background: #4CAF50; color: white; } /* Save */
-.edit-buttons button:last-child { background: #f44336; color: white; }  /* Cancel */
-
-
-</style>
-
 </head>
 
 <body>
@@ -765,11 +654,6 @@ background-color: rgba(255, 255, 255, 0.08);
         <div class="header-actions">
             <i class="fas fa-search"></i>
         </div>
-    </div>
-
-    <div class="sidebar-search">
-        <input type="text" id="userSearchInput" placeholder="Search by @username...">
-        <div id="searchResults" class="search-results"></div>
     </div>
 
     <div class="chat-list">
@@ -824,17 +708,17 @@ background-color: rgba(255, 255, 255, 0.08);
 
 <!-- CHAT AREA -->
 
-<?php if (!empty($display_name)): ?>
 <div class="chat-area">
 
     <!-- CHAT HEADER -->
     <div class="chat-header">
-
+        <!-- حالت عادی -->
         <div id="chat-header-normal">
             <img src="<?= $avatar_url ?>" class="chat-avatar-area"
                  onerror="this.src='uploads/default-avatar.png'">
             <div class="chat-title"><?= htmlspecialchars($display_name) ?></div>
         </div>
+
         <!-- حالت انتخاب (اول مخفی) -->
         <div id="chat-header-select" style="display: none;">
             <div class="select-left">
@@ -863,8 +747,6 @@ background-color: rgba(255, 255, 255, 0.08);
         <button onclick="sendMessage()">Send</button>
     </div>
 </div>
-
-<?php endif; ?>
 
 
 <!-- Modal Background -->
@@ -1018,44 +900,47 @@ function addMessage(id, uuid, text, isSelf, time, isSeen, messageId) {
     div.className = "message " + (isSelf ? "self" : "other");
     // div.id = "msg-" + messageId;
 
-    div.dataset.messageId = messageId;
+    const mid = uuid || id;
+    div.dataset.messageId = mid;
     
     div.style.position = "relative";
 		
+
+    console.log('addMessage => messageId =', mid, 'text =', text);
 
     div.innerHTML = `
 	<div class="msg-content">${text}</div>
         <div class="time">${time} <span>${tick}</span></div>
         <div class="msg-actions" style="display: none;">
-            <div class="menu-item" onclick="msgAction(event, 'reply', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'reply', ${messageId})">
                 <span class="menu-icon">↩</span>
                 <span class="menu-text">Reply</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'pin', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'pin', ${messageId})">
                 <span class="menu-icon">📌</span>
                 <span class="menu-text">Pin</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'copy', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'copy', ${messageId})">
                 <span class="menu-icon">📋</span>
                 <span class="menu-text">Copy</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'forward', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'forward', ${messageId})">
                 <span class="menu-icon">➡</span>
                 <span class="menu-text">Forward</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'save', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'save', ${messageId})">
                 <span class="menu-icon">💾</span>
                 <span class="menu-text">Save message</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'edit', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'edit', ${messageId})">
                 <span class="menu-icon">✏️</span>
                 <span class="menu-text">Edit</span>
             </div>
-            <div class="menu-item" onclick="msgAction(event, 'delete', '${messageId}')">
+            <div class="menu-item" onclick="msgAction(event, 'delete', ${messageId})">
                 <span class="menu-icon">🗑</span>
                 <span class="menu-text">Delete</span>
             </div>
-            <div class="menu-item btn-reaction" onclick="msgAction(event, 'reaction', '${messageId}')">
+            <div class="menu-item btn-reaction" onclick="msgAction(event, 'reaction', ${messageId})">
                 <span class="menu-icon">😊</span>
                 <span class="menu-text">Reaction</span>
             </div>
@@ -1105,9 +990,7 @@ async function loadMessages() {
             minute: "2-digit"
         });
 
-	const isSelf = (m.sender_id == sender_id);
-	const messageId = m.id;
-	addMessage(m.id, m.uuid, m.message, isSelf, time, m.seen, messageId);
+	addMessage(m.message, m.sender_id == sender_id, time, m.seen);
     });
 
     fetch(`http://` + window.location.host  + `:8000/seen/${chat_id}/${sender_id}`, {
@@ -1119,7 +1002,7 @@ async function loadMessages() {
 
 /* websocket */
 
-const ws=new WebSocket("ws://" + window.location.hostname + ":8000/ws/" + sender_id);
+const ws=new WebSocket("ws://" + window.location.hostname + "/ws/" + sender_id);
 
 ws.onmessage=e=>{
 
@@ -1135,14 +1018,8 @@ if(data.chat_id===chat_id){
 
 /* addMessage(data.message,data.sender_id==sender_id,time); */
 const isSelf = data.sender_id == sender_id;
-//addMessage(data.message, isSelf, time, isSelf ? false : null);
-addMessage(
-    data.message,
-    isSelf,
-    time,
-    data.id || data.uuid,
-    isSelf ? "" : ""  // اگر خواستی تیک برای پیام‌های طرف مقابل تعیی کنی
-);
+addMessage(data.message, isSelf, time, isSelf ? false : null);
+
 }
 
 };
@@ -1408,61 +1285,19 @@ function msgAction(event, action, messageId) {
     console.log("Action:", action, "on", messageId);
 
     if (action === 'copy') {
-	const messageElement = document.querySelector(`.message[data-messageId="${messageId}"], .message[data-message-id="${messageId}"]`);
-		    
+        const messageElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
 	if (messageElement) {
-	    const contentEl = messageElement.querySelector('.msg-content');
-	    const textToCopy = contentEl ? contentEl.innerText : '';
-	    
-	    console.log('Attempting copy via fallback...');
-			            
-	    const textArea = document.createElement("textarea");
-	    textArea.value = textToCopy;
-	                           
-	    textArea.style.position = "fixed";
-	    textArea.style.left = "-9999px";
-	    textArea.style.top = "0";
-	    document.body.appendChild(textArea);
-	                                                     
-	    textArea.focus();
-	    textArea.select();
-				                                                                                                     
-	    try {
-		const successful = document.execCommand('copy');
-		if (successful) {
-		    console.log('Message copied successfully!');
-	        } else {
-		    console.error('Unable to copy');
-		}
-	} catch (err) {
-		console.error('Fallback copy error:', err);
+	    const textToCopy = messageElement.querySelector('.msg-content').innerText;
+	    navigator.clipboard.writeText(textToCopy).then(() => {
+	        console.log('Message copied to clipboard');
+	    }).catch(err => {
+	        console.error('Failed to copy message: ', err);
+	    });
 	}
-	
-	document.body.removeChild(textArea);
-      }
     }
     else if (action === 'delete') {
     }
     else if (action === 'edit') {
-	     const messageElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
-	     if (!messageElement) return;
-
-	     const contentEl = messageElement.querySelector('.msg-content');
-	     const originalText = contentEl.innerText;
-
-	     const editContainer = document.createElement('div');
-	     editContainer.className = 'edit-box';
-	     editContainer.innerHTML = `
-		 <textarea class="edit-input">${originalText}</textarea>
-            	 <div class="edit-buttons">
-                     <button onclick="saveEdit('${messageId}')">Save</button>
-                     <button onclick="cancelEdit('${messageId}')">Cancel</button>
-                 </div>
-	     `;
-
-	     contentEl.style.display = 'none';
-	     messageElement.prepend(editContainer);
-
     }
 
     closeAllMsgActions();
@@ -1478,52 +1313,6 @@ function closeAllMsgActions() {
 
 }
 
-async function saveEdit(messageId) {
-    const messageElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
-    const newText = messageElement.querySelector('.edit-input').value;
-
-    try {
-	console.log(messageId)
-	const response = await fetch('http://' + window.location.hostname + ':8000/update_message', {
-	    method: 'POST',
-	    headers: { 'Content-Type': 'application/json' },
-	    body: JSON.stringify({
-		message_id: messageId,
-		new_content: newText
-	    })
-	});
-
-	if (response.ok) {
-	    const contentEl = messageElement.querySelector('.msg-content');
-	    contentEl.innerText = newText;
-	    finishEditing(messageElement);
-	} else {
-	    alert("خطا در ویرایش پیام");
-        }
-    } catch (err) {
-        console.error("Error updating message:", err);
-    }
-}
-
-function cancelEdit(messageId) {
-    const messageElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
-    if (messageElement) {
-	const editBox = messageElement.querySelector('.edit-box');
-	if (editBox) editBox.remove();
-	
-	const contentEl = messageElement.querySelector('.msg-content');
-	if (contentEl) {
-	    contentEl.style.display = 'block';
-	}
-    }
-}
-
-function finishEditing(messageElement) {
-    const editBox = messageElement.querySelector('.edit-box');
-    if (editBox) editBox.remove();
-    messageElement.querySelector('.msg-content').style.display = 'block';
-}
-			                                                                 
 
 /* --- Selection Mode --- */
 
@@ -1589,55 +1378,6 @@ if (e.target.closest('.msg-actions') || e.target.closest('.message')) {
 closeAllMsgActions();
 });
 					
-</script>
-
-<script>
-const input = document.getElementById("userSearchInput");
-const resultsBox = document.getElementById("searchResults");
-
-input.addEventListener("input", function () {
-    const value = this.value.trim();
-
-    console.log("search value:", value);
-
-    if (!value.startsWith("@")) {
-        resultsBox.style.display = "none";
-	resultsBox.innerHTML = "";
-	return;
-    }
-				    
-    const username = value.substring(1); // حذف @
-				    
-    if (username.length < 1) {
-        resultsBox.style.display = "none";
-	return;
-    }
-				    
-    fetch("search_user.php?username=" + encodeURIComponent(username))
-	.then(res => res.json())
-	.then(data => {
-	    resultsBox.innerHTML = "";
-
-            if (data.length === 0) {
-	        resultsBox.style.display = "none";
-		return;
-	    }
-				    
-	    data.forEach(user => {
-		const div = document.createElement("div");
-		div.className = "search-item";
-		div.innerText = "@" + user.username;
-
-                div.onclick = () => {
-		    window.location.href = "chat.php?user_id=" + user.id;
-		};
-				    
-		resultsBox.appendChild(div);
-	    });
-
-            resultsBox.style.display = "block";
-        });
-});
 </script>
 
 </body>

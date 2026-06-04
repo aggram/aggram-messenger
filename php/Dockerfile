@@ -1,6 +1,6 @@
 FROM php:8.3-fpm
 
-RUN printf "Types: deb\nURIs: http://mirror.arvancloud.ir/debian\nSuites: trixie trixie-updates\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.pgp\n" > /etc/apt/sources.list.d/debian.sources
+RUN printf "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: trixie trixie-updates\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.pgp\n" > /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
